@@ -2,10 +2,16 @@ package sse
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+// String returns a string representation of the event.
+func (e *Event) String() string {
+	return fmt.Sprintf("{Type:%#v, Data:%#v, ID:%#v}", e.Type, e.Data, e.ID)
+}
 
 func TestScanLines(t *testing.T) {
 	for _, v := range []struct {
@@ -83,6 +89,82 @@ func TestReader(t *testing.T) {
 			Events: nil,
 			Err:    nil,
 		},
+		{
+			Name:   "Comment",
+			Input:  ":test\n\n",
+			Events: nil,
+			Err:    nil,
+		},
+		{
+			Name:   "Field without CRLF",
+			Input:  "event",
+			Events: nil,
+			Err:    nil,
+		},
+		{
+			Name:   "Field with no value",
+			Input:  "event\n\n",
+			Events: nil,
+			Err:    nil,
+		},
+		{
+			Name:   "Event with no type",
+			Input:  "data\n\n",
+			Events: []*Event{{Type: defaultMessageType}},
+			Err:    nil,
+		},
+		{
+			Name:   "Event with type",
+			Input:  "event:1\ndata:\n\n",
+			Events: []*Event{{Type: "1"}},
+			Err:    nil,
+		},
+		{
+			Name:   "Event with ID",
+			Input:  "id:1\ndata:\n\n",
+			Events: []*Event{{Type: defaultMessageType, ID: "1"}},
+			Err:    nil,
+		},
+		{
+			Name:  "Event retaining previous ID",
+			Input: "id:1\ndata:\n\ndata:\n\n",
+			Events: []*Event{
+				{Type: defaultMessageType, ID: "1"},
+				{Type: defaultMessageType, ID: "1"},
+			},
+			Err: nil,
+		},
+		{
+			Name:   "Ignore NULL character in ID",
+			Input:  "id:\x00\ndata:\n\n",
+			Events: []*Event{{Type: defaultMessageType}},
+			Err:    nil,
+		},
+		{
+			Name:   "Event with multiline data",
+			Input:  "data:\ndata:\n\n",
+			Events: []*Event{{Type: defaultMessageType, Data: "\n"}},
+			Err:    nil,
+		},
+		{
+			Name:  "WHATWG example #1",
+			Input: ": test stream\n\ndata: first event\nid: 1\n\ndata:second event\nid\n\ndata:  third event\n\n",
+			Events: []*Event{
+				{Type: defaultMessageType, Data: "first event", ID: "1"},
+				{Type: defaultMessageType, Data: "second event"},
+				{Type: defaultMessageType, Data: " third event"},
+			},
+			Err: nil,
+		},
+		{
+			Name:  "WHATWG example #2",
+			Input: "data\n\ndata\ndata\n\ndata:",
+			Events: []*Event{
+				{Type: defaultMessageType},
+				{Type: defaultMessageType, Data: "\n"},
+			},
+			Err: nil,
+		},
 	} {
 		var (
 			r            = NewReader(strings.NewReader(v.Input))
@@ -101,7 +183,7 @@ func TestReader(t *testing.T) {
 			events = append(events, e)
 		}
 		if !reflect.DeepEqual(events, v.Events) {
-			t.Fatalf("%s (events): %#v != %#v", v.Name, events, v.Events)
+			t.Fatalf("%s (events): %+v != %+v", v.Name, events, v.Events)
 		}
 		if nextEventErr != v.Err {
 			t.Fatalf("%s (err): %#v != %#v", v.Name, nextEventErr, v.Err)
