@@ -34,7 +34,11 @@ func (c *Client) connectionLoop(
 		if err != nil {
 			return err
 		}
-		eventChan <- e
+		select {
+		case eventChan <- e:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
