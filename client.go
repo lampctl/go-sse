@@ -34,6 +34,9 @@ func (c *Client) connectionLoop(
 		if err != nil {
 			return err
 		}
+		if e == nil {
+			return nil
+		}
 		select {
 		case eventChan <- e:
 		case <-ctx.Done():
