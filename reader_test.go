@@ -78,52 +78,68 @@ func TestScanLines(t *testing.T) {
 
 func TestReader(t *testing.T) {
 	for _, v := range []struct {
-		Name   string
-		Input  string
-		Events []*Event
-		Err    error
+		Name             string
+		Input            string
+		Events           []*Event
+		Err              error
+		LastEventID      string
+		ReconnectionTime int
 	}{
 		{
-			Name:   "Empty",
-			Input:  "",
-			Events: nil,
-			Err:    nil,
+			Name:             "Empty",
+			Input:            "",
+			Events:           nil,
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Comment",
-			Input:  ":test\n\n",
-			Events: nil,
-			Err:    nil,
+			Name:             "Comment",
+			Input:            ":test\n\n",
+			Events:           nil,
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Field without CRLF",
-			Input:  "event",
-			Events: nil,
-			Err:    nil,
+			Name:             "Field without CRLF",
+			Input:            "event",
+			Events:           nil,
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Field with no value",
-			Input:  "event\n\n",
-			Events: nil,
-			Err:    nil,
+			Name:             "Field with no value",
+			Input:            "event\n\n",
+			Events:           nil,
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Event with no type",
-			Input:  "data\n\n",
-			Events: []*Event{{Type: defaultMessageType}},
-			Err:    nil,
+			Name:             "Event with no type",
+			Input:            "data\n\n",
+			Events:           []*Event{{Type: defaultMessageType}},
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Event with type",
-			Input:  "event:1\ndata:\n\n",
-			Events: []*Event{{Type: "1"}},
-			Err:    nil,
+			Name:             "Event with type",
+			Input:            "event:1\ndata:\n\n",
+			Events:           []*Event{{Type: "1"}},
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Event with ID",
-			Input:  "id:1\ndata:\n\n",
-			Events: []*Event{{Type: defaultMessageType, ID: "1"}},
-			Err:    nil,
+			Name:             "Event with ID",
+			Input:            "id:1\ndata:\n\n",
+			Events:           []*Event{{Type: defaultMessageType, ID: "1"}},
+			Err:              nil,
+			LastEventID:      "1",
+			ReconnectionTime: 0,
 		},
 		{
 			Name:  "Event retaining previous ID",
@@ -132,31 +148,41 @@ func TestReader(t *testing.T) {
 				{Type: defaultMessageType, ID: "1"},
 				{Type: defaultMessageType, ID: "1"},
 			},
-			Err: nil,
+			Err:              nil,
+			LastEventID:      "1",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Ignore NULL character in ID",
-			Input:  "id:\x00\ndata:\n\n",
-			Events: []*Event{{Type: defaultMessageType}},
-			Err:    nil,
+			Name:             "Ignore NULL character in ID",
+			Input:            "id:\x00\ndata:\n\n",
+			Events:           []*Event{{Type: defaultMessageType}},
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Retry",
-			Input:  "data\nretry:10\n\n",
-			Events: []*Event{{Type: defaultMessageType, Retry: 10}},
-			Err:    nil,
+			Name:             "Retry",
+			Input:            "data\nretry:10\n\n",
+			Events:           []*Event{{Type: defaultMessageType}},
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 10,
 		},
 		{
-			Name:   "Bad retry",
-			Input:  "data\nretry:$\n\n",
-			Events: []*Event{{Type: defaultMessageType}},
-			Err:    nil,
+			Name:             "Bad retry",
+			Input:            "data\nretry:$\n\n",
+			Events:           []*Event{{Type: defaultMessageType}},
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
-			Name:   "Event with multiline data",
-			Input:  "data:\ndata:\n\n",
-			Events: []*Event{{Type: defaultMessageType, Data: "\n"}},
-			Err:    nil,
+			Name:             "Event with multiline data",
+			Input:            "data:\ndata:\n\n",
+			Events:           []*Event{{Type: defaultMessageType, Data: "\n"}},
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
 			Name:  "WHATWG example #1",
@@ -166,7 +192,9 @@ func TestReader(t *testing.T) {
 				{Type: defaultMessageType, Data: "second event"},
 				{Type: defaultMessageType, Data: " third event"},
 			},
-			Err: nil,
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 		{
 			Name:  "WHATWG example #2",
@@ -175,7 +203,9 @@ func TestReader(t *testing.T) {
 				{Type: defaultMessageType},
 				{Type: defaultMessageType, Data: "\n"},
 			},
-			Err: nil,
+			Err:              nil,
+			LastEventID:      "",
+			ReconnectionTime: 0,
 		},
 	} {
 		var (
@@ -199,6 +229,12 @@ func TestReader(t *testing.T) {
 		}
 		if nextEventErr != v.Err {
 			t.Fatalf("%s (err): %#v != %#v", v.Name, nextEventErr, v.Err)
+		}
+		if r.LastEventID != v.LastEventID {
+			t.Fatalf("%s (err): %#v != %#v", v.Name, r.LastEventID, v.LastEventID)
+		}
+		if r.ReconnectionTime != v.ReconnectionTime {
+			t.Fatalf("%s (err): %#v != %#v", v.Name, r.ReconnectionTime, v.ReconnectionTime)
 		}
 	}
 }

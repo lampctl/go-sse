@@ -38,8 +38,19 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 
 // Reader reads events from an io.Reader.
 type Reader struct {
-	scanner     *bufio.Scanner
-	lastEventID string
+	scanner *bufio.Scanner
+
+	// LastEventID maintains the ID of the last event received. If the last
+	// event did not contain an ID, then the value from the previous event is
+	// used. If no event with an ID has been received, this will be set to the
+	// zero value.
+	LastEventID string
+
+	// ReconnectionTime indicates how long the client should wait (in MS)
+	// before attempting to reconnect to the server. Note that this is set to
+	// the zero value unless the server changes it and a sensible default
+	// should be selected in place of the zero value.
+	ReconnectionTime int
 }
 
 // NewReader creates a new Reader instance for the provided io.Reader.
@@ -52,13 +63,13 @@ func NewReader(r io.Reader) *Reader {
 }
 
 // NextEvent blocks until the next event is received, there are no more events,
-// or an error occurs.
+// or an error occurs. No event or error will be returned if there are no more
+// events.
 func (r *Reader) NextEvent() (*Event, error) {
 	var (
-		eventType  = defaultMessageType
-		eventData  []string
-		eventID    = r.lastEventID
-		eventRetry int
+		eventType = defaultMessageType
+		eventData []string
+		eventID   = r.LastEventID
 	)
 	for len(eventData) == 0 {
 		for {
@@ -91,21 +102,20 @@ func (r *Reader) NextEvent() (*Event, error) {
 			case fieldNameID:
 				if !bytes.Contains(value, []byte{'\x00'}) {
 					eventID = string(value)
-					r.lastEventID = eventID
+					r.LastEventID = eventID
 				}
 			case fieldNameRetry:
 				i, err := strconv.Atoi(string(value))
 				if err != nil {
 					continue
 				}
-				eventRetry = i
+				r.ReconnectionTime = i
 			}
 		}
 	}
 	return &Event{
-		Type:  eventType,
-		Data:  strings.Join(eventData, "\n"),
-		ID:    eventID,
-		Retry: eventRetry,
+		Type: eventType,
+		Data: strings.Join(eventData, "\n"),
+		ID:   eventID,
 	}, nil
 }
