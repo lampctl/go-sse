@@ -141,6 +141,18 @@ func TestReader(t *testing.T) {
 			Err:    nil,
 		},
 		{
+			Name:   "Retry",
+			Input:  "data\nretry:10\n\n",
+			Events: []*Event{{Type: defaultMessageType, Retry: 10}},
+			Err:    nil,
+		},
+		{
+			Name:   "Bad retry",
+			Input:  "data\nretry:$\n\n",
+			Events: []*Event{{Type: defaultMessageType}},
+			Err:    nil,
+		},
+		{
 			Name:   "Event with multiline data",
 			Input:  "data:\ndata:\n\n",
 			Events: []*Event{{Type: defaultMessageType, Data: "\n"}},

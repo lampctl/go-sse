@@ -11,7 +11,8 @@ const (
 
 // Event represents an individual event from the event stream.
 type Event struct {
-	Type string
-	Data string
-	ID   string
+	Type  string
+	Data  string
+	ID    string
+	Retry int
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -54,9 +55,10 @@ func NewReader(r io.Reader) *Reader {
 // or an error occurs.
 func (r *Reader) NextEvent() (*Event, error) {
 	var (
-		eventType = defaultMessageType
-		eventData []string
-		eventID   = r.lastEventID
+		eventType  = defaultMessageType
+		eventData  []string
+		eventID    = r.lastEventID
+		eventRetry int
 	)
 	for len(eventData) == 0 {
 		for {
@@ -91,12 +93,19 @@ func (r *Reader) NextEvent() (*Event, error) {
 					eventID = string(value)
 					r.lastEventID = eventID
 				}
+			case fieldNameRetry:
+				i, err := strconv.Atoi(string(value))
+				if err != nil {
+					continue
+				}
+				eventRetry = i
 			}
 		}
 	}
 	return &Event{
-		Type: eventType,
-		Data: strings.Join(eventData, "\n"),
-		ID:   eventID,
+		Type:  eventType,
+		Data:  strings.Join(eventData, "\n"),
+		ID:    eventID,
+		Retry: eventRetry,
 	}, nil
 }
