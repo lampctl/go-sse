@@ -2,9 +2,12 @@ package sse
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
+
+var ErrNoContent = errors.New("no content response received")
 
 // Client connects to a server providing SSE. The client will continue to
 // maintain the connection, reconnecting if it is lost.
@@ -28,6 +31,9 @@ func (c *Client) connectionLoop(
 		return err
 	}
 	defer r.Body.Close()
+	if r.StatusCode == http.StatusNoContent {
+		return ErrNoContent
+	}
 	reader := NewReader(r.Body)
 	for {
 		e, err := reader.NextEvent()
@@ -57,6 +63,9 @@ func (c *Client) lifecycleLoop(
 	for {
 		err := c.connectionLoop(ctx, eventChan)
 		if err != nil {
+			if err == ErrNoContent {
+				return
+			}
 			select {
 			case <-time.After(time.Second * 3):
 			case <-ctx.Done():
