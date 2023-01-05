@@ -1,6 +1,6 @@
 ## go-sse
 
-[![Build Status](https://app.travis-ci.com/lampctl/go-sse.svg?branch=main)](https://app.travis-ci.com/github/lampctl/go-sse)
+[![Build Status](https://github.com/lampctl/go-sse/actions/workflows/test.yml/badge.svg)](https://github.com/lampctl/go-sse/actions/workflows/test.yml)
 [![Coverage Status](https://coveralls.io/repos/github/lampctl/go-sse/badge.svg?branch=main)](https://coveralls.io/github/lampctl/go-sse?branch=main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/lampctl/go-sse)](https://goreportcard.com/report/github.com/lampctl/go-sse)
 [![Go Reference](https://pkg.go.dev/badge/github.com/lampctl/go-sse.svg)](https://pkg.go.dev/github.com/lampctl/go-sse)
