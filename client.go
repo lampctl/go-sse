@@ -31,6 +31,9 @@ func (c *Client) connectionLoop(
 	eventChan chan<- *Event,
 ) error {
 	req := c.req.Clone(ctx)
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Connection", "keep-alive")
 	if len(c.lastEventID) != 0 {
 		req.Header.Set("Last-Event-ID", c.lastEventID)
 	}
