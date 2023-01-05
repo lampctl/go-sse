@@ -21,7 +21,7 @@ import "github.com/lampctl/go-sse"
 Next, create a client:
 
 ```golang
-c, err := NewClientFromURL("http://example.com/sse")
+c, err := sse.NewClientFromURL("http://example.com/sse")
 if err != nil {
     // ...
 }
