@@ -26,11 +26,11 @@ type Event struct {
 func (e *Event) Bytes() []byte {
 	b := &bytes.Buffer{}
 	if e.Type != "" {
-		fmt.Fprintf(b, "event:%s\r", e.Type)
+		fmt.Fprintf(b, "event:%s\n", e.Type)
 	}
 	if e.ID != "" {
-		fmt.Fprintf(b, "id:%s\r", e.ID)
+		fmt.Fprintf(b, "id:%s\n", e.ID)
 	}
-	fmt.Fprintf(b, "data:%s\r\r", e.Data)
+	fmt.Fprintf(b, "data:%s\n\n", e.Data)
 	return b.Bytes()
 }
