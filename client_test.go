@@ -16,7 +16,7 @@ func receiveAtLeastNEvents(
 	c *Client,
 	timeout time.Duration,
 ) error {
-	tCh := time.After(CLIENT_DELAY)
+	tCh := time.After(timeout)
 	for i := 0; i < n; i++ {
 		select {
 		case _, ok := <-c.Events:
