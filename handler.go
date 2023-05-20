@@ -31,6 +31,7 @@ type Handler struct {
 	cfg        *HandlerConfig
 	eventQueue []*Event
 	eventChans map[chan *Event]any
+	isClosed   bool
 }
 
 // NewHandler creates a new Handler instance.
@@ -54,6 +55,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Register the channel
 	h.mutex.Lock()
+	if h.isClosed {
+		h.mutex.Unlock()
+		http.Error(
+			w,
+			http.StatusText(http.StatusServiceUnavailable),
+			http.StatusServiceUnavailable,
+		)
+		return
+	}
 	h.waitGroup.Add(1)
 	defer h.waitGroup.Done()
 	eventChan := make(chan *Event, h.cfg.ChannelBufferSize)
@@ -111,14 +121,12 @@ func (h *Handler) Send(e *Event) {
 }
 
 // Close shuts down all of the event channels and waits for them to complete.
-// The handler must not be invoked once this method is called. For example,
-// call Shutdown() on an http.Server before this method to make sure no new
-// requests cause the handler to be called.
 func (h *Handler) Close() {
 	h.mutex.Lock()
 	for c := range h.eventChans {
 		close(c)
 	}
+	h.isClosed = true
 	h.mutex.Unlock()
 	h.waitGroup.Wait()
 }

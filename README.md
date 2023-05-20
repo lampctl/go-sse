@@ -70,7 +70,7 @@ h.Send(&sse.Event{
 })
 ```
 
-When you are done, use the `Close()` method. Note that you **must** ensure the handler will not be invoked after calling this method (for example, call `Shutdown()` on an `http.Server` first):
+When you are done, use the `Close()` method:
 
 ```golang
 h.Close()

@@ -63,19 +63,18 @@ func TestHandler(t *testing.T) {
 	} {
 		func() {
 
-			// Create the handler & server
+			// Create the handler
 			var (
 				h = NewHandler(&HandlerConfig{
 					ChannelBufferSize: v.ChannelBufferSize,
 				})
-				s      = httptest.NewServer(h)
-				hClose = runOnce(func() {
-					s.Listener.Close()
-					h.Close()
-					s.Close()
-				})
+				hClose = runOnce(func() { h.Close() })
 			)
 			defer hClose()
+
+			// Create the server
+			s := httptest.NewServer(h)
+			defer s.Close()
 
 			// Create the client
 			c, err := NewClientFromURL(s.URL)
