@@ -2,6 +2,7 @@ package sse
 
 import (
 	"testing"
+	"time"
 )
 
 func TestBytes(t *testing.T) {
@@ -19,6 +20,11 @@ func TestBytes(t *testing.T) {
 			Name:   "event with ID and type",
 			Event:  &Event{Type: "test", ID: "1"},
 			Output: "event:test\rid:1\rdata:\r\r",
+		},
+		{
+			Name:   "event with retry",
+			Event:  &Event{Retry: 1 * time.Second},
+			Output: "retry:1000\rdata:\r\r",
 		},
 	} {
 		b := v.Event.Bytes()

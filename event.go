@@ -3,6 +3,7 @@ package sse
 import (
 	"bytes"
 	"fmt"
+	"time"
 )
 
 const (
@@ -19,6 +20,9 @@ type Event struct {
 	Type string
 	Data string
 	ID   string
+
+	// Retry is only used when sending events, not receiving them.
+	Retry time.Duration
 }
 
 // Bytes returns the byte representation of the event. Note that the result is
@@ -30,6 +34,9 @@ func (e *Event) Bytes() []byte {
 	}
 	if e.ID != "" {
 		fmt.Fprintf(b, "id:%s\r", e.ID)
+	}
+	if e.Retry != 0 {
+		fmt.Fprintf(b, "retry:%d\r", e.Retry.Milliseconds())
 	}
 	fmt.Fprintf(b, "data:%s\r\r", e.Data)
 	return b.Bytes()
