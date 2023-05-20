@@ -75,8 +75,26 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
 
-	// TODO: write the missing events if necessary
-	// lastEventID = r.Header.Get("Last-Event-ID")
+	// Write the missing events if necessary
+	lastEventID := r.Header.Get("Last-Event-ID")
+	if lastEventID != "" {
+		events := []*Event{}
+		func() {
+			defer h.mutex.Unlock()
+			h.mutex.Lock()
+			lastEventIdx := -1
+			for i, e := range h.eventQueue {
+				if lastEventID == e.ID {
+					lastEventIdx = i
+				}
+			}
+			events = append(events, h.eventQueue[lastEventIdx+1:]...)
+		}()
+		for _, e := range events {
+			w.Write(e.Bytes())
+		}
+		f.Flush()
+	}
 
 	// Write events as they come in
 	for {

@@ -2,18 +2,55 @@ package sse
 
 import (
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
 
-func runOnce(fn func()) func() {
-	hasRun := false
-	return func() {
-		if !hasRun {
-			fn()
-			hasRun = true
-		}
+type testHandlerServerAndClient struct {
+	Handler *Handler
+	Server  *httptest.Server
+	Client  *Client
+}
+
+func (h *testHandlerServerAndClient) CreateHandlerAndServer() {
+	h.Handler = NewHandler(nil)
+	h.Server = httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				if h.Handler != nil {
+					h.Handler.ServeHTTP(w, r)
+				}
+			},
+		),
+	)
+}
+
+func (h *testHandlerServerAndClient) CloseHandlerAndServer() {
+	if h.Handler != nil {
+		h.Handler.Close()
+		h.Handler = nil
+	}
+	if h.Server != nil {
+		h.Server.Close()
+		h.Server = nil
+	}
+}
+
+func (h *testHandlerServerAndClient) CreateClient() error {
+	c, err := NewClientFromURL(h.Server.URL)
+	if err != nil {
+		return err
+	}
+	h.Client = c
+	return nil
+}
+
+func (h *testHandlerServerAndClient) CloseClient() {
+	if h.Client != nil {
+		h.Client.Close()
+		h.Client = nil
 	}
 }
 
@@ -21,18 +58,13 @@ func TestHandler(t *testing.T) {
 	for _, v := range []struct {
 		Name              string
 		ChannelBufferSize int
-		Fn                func(
-			h *Handler,
-			hClose func(),
-			c *Client,
-			cClose func(),
-		) error
+		Fn                func(*testHandlerServerAndClient) error
 	}{
 		{
 			Name: "basic event propagation",
-			Fn: func(h *Handler, hClose func(), c *Client, cClose func()) error {
-				h.Send(&Event{ID: "1"})
-				if err := receiveAtLeastNEvents(1, c, CLIENT_DELAY); err != nil {
+			Fn: func(h *testHandlerServerAndClient) error {
+				h.Handler.Send(&Event{ID: "1"})
+				if err := receiveAtLeastNEvents(1, h.Client, CLIENT_DELAY); err != nil {
 					return err
 				}
 				return nil
@@ -40,13 +72,13 @@ func TestHandler(t *testing.T) {
 		},
 		{
 			Name: "handle client disconnect",
-			Fn: func(h *Handler, hClose func(), c *Client, cClose func()) error {
-				cClose()
+			Fn: func(h *testHandlerServerAndClient) error {
+				h.CloseClient()
 				time.Sleep(CLIENT_DELAY)
 				return func() error {
-					defer h.mutex.Unlock()
-					h.mutex.Lock()
-					if len(h.eventChans) != 0 {
+					defer h.Handler.mutex.Unlock()
+					h.Handler.mutex.Lock()
+					if len(h.Handler.eventChans) != 0 {
 						return errors.New("client event channel still present")
 					}
 					return nil
@@ -55,40 +87,55 @@ func TestHandler(t *testing.T) {
 		},
 		{
 			Name: "handle server disconnect",
-			Fn: func(h *Handler, hClose func(), c *Client, cClose func()) error {
-				hClose()
+			Fn: func(h *testHandlerServerAndClient) error {
+				h.CloseHandlerAndServer()
 				return nil
+			},
+		},
+		{
+			Name: "send last events",
+			Fn: func(h *testHandlerServerAndClient) error {
+
+				// Send the first event and receive it
+				h.Handler.Send(&Event{ID: "1", Retry: 2 * CLIENT_DELAY})
+				if err := receiveAtLeastNEvents(1, h.Client, CLIENT_DELAY); err != nil {
+					return err
+				}
+
+				// Disconnect the client and send a message before the client
+				// reconnects; it should request and receive the last message
+				func() {
+					defer h.Handler.mutex.Unlock()
+					h.Handler.mutex.Lock()
+					for c := range h.Handler.eventChans {
+						close(c)
+						delete(h.Handler.eventChans, c)
+					}
+				}()
+				time.Sleep(CLIENT_DELAY)
+				h.Handler.Send(&Event{})
+
+				// Wait for the client to reconnect and fetch the missed event
+				return receiveAtLeastNEvents(1, h.Client, 2*CLIENT_DELAY)
 			},
 		},
 	} {
 		func() {
 
-			// Create the handler
-			var (
-				h = NewHandler(&HandlerConfig{
-					ChannelBufferSize: v.ChannelBufferSize,
-				})
-				hClose = runOnce(func() { h.Close() })
-			)
-			defer hClose()
-
-			// Create the server
-			s := httptest.NewServer(h)
-			defer s.Close()
-
-			// Create the client
-			c, err := NewClientFromURL(s.URL)
-			if err != nil {
+			// Create the handler, server, and client
+			h := &testHandlerServerAndClient{}
+			h.CreateHandlerAndServer()
+			defer h.CloseHandlerAndServer()
+			if err := h.CreateClient(); err != nil {
 				t.Fatalf("%s: %s", v.Name, err)
 			}
-			cClose := runOnce(func() { c.Close() })
-			defer cClose()
+			defer h.CloseClient()
 
 			// Wait for the client to connect
 			time.Sleep(CLIENT_DELAY)
 
 			// Run the test
-			if err := v.Fn(h, hClose, c, cClose); err != nil {
+			if err := v.Fn(h); err != nil {
 				t.Fatalf("%s: %s", v.Name, err)
 			}
 		}()
