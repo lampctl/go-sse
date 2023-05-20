@@ -8,6 +8,14 @@
 
 This package attempts to provide a robust and reliable implementation of [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html#concept-event-stream-reconnection-time). One might use this package if they were writing an application that needed to connect to an SSE server endpoint and read events in a continuous stream or provide events to a front-end service.
 
+### Features
+
+Here's what you get with this package:
+
+- Complete documentation for every last type and method in the package
+- Compliancy with section 9.2 of the WHATWG HTML specification
+- Extensive test suite to ensure conformance
+
 go-sse requires a minimum of **Go 1.18**.
 
 ### Basic Usage
