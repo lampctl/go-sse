@@ -6,7 +6,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/lampctl/go-sse.svg)](https://pkg.go.dev/github.com/lampctl/go-sse)
 [![MIT License](https://img.shields.io/badge/license-MIT-9370d8.svg?style=flat)](https://opensource.org/licenses/MIT)
 
-This package attempts to provide a robust and reliable implementation of [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html#concept-event-stream-reconnection-time). One might use this package if they were writing an application that needed to connect to an SSE server endpoint and read events in a continuous stream.
+This package attempts to provide a robust and reliable implementation of [server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html#concept-event-stream-reconnection-time). One might use this package if they were writing an application that needed to connect to an SSE server endpoint and read events in a continuous stream or provide events to a front-end service.
 
 go-sse requires a minimum of **Go 1.18**.
 
@@ -18,7 +18,9 @@ To use the package in your application, begin by importing it:
 import "github.com/lampctl/go-sse"
 ```
 
-Next, create a client:
+### Use as a Client
+
+Create a client using:
 
 ```golang
 c, err := sse.NewClientFromURL("http://example.com/sse")
@@ -42,4 +44,34 @@ When you are done receiving events, close the client:
 
 ```golang
 c.Close()
+```
+
+### Use as a Server
+
+The server component is provided via `Handler`, which implements `http.Handler`:
+
+```golang
+h := sse.NewHandler(nil)
+
+// ...or if you want to customize initialization:
+h := sse.NewHandler(&sse.HandlerConfig{
+    NumEventsToKeep:   10,
+    ChannelBufferSize: 4,
+})
+```
+
+To send an event, simply use the `Send()` method:
+
+```golang
+h.Send(&sse.Event{
+    Type: "alert",
+    Data: "The aliens are invading!",
+    ID:   "12345",
+})
+```
+
+When you are done, use the `Close()` method. Note that you **must** ensure the handler will not be invoked after calling this method (for example, call `Shutdown()` on an `http.Server` first):
+
+```golang
+h.Close()
 ```
