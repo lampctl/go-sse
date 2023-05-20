@@ -65,6 +65,17 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			Name: "Process carriage returns",
+			Client: func(c *Client) error {
+				return receiveAtLeastNEvents(1, c, CLIENT_DELAY)
+			},
+			Server: func(w http.ResponseWriter, r *http.Request, i int) error {
+				w.Write([]byte("data\r\r"))
+				flushAndWait(w)
+				return nil
+			},
+		},
+		{
 			Name: "Cancel while sending on channel",
 			Client: func(c *Client) error {
 				time.Sleep(CLIENT_DELAY)

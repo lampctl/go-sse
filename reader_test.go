@@ -23,8 +23,8 @@ func TestScanLines(t *testing.T) {
 		Err     error
 	}{
 		{
-			Name:    "Carriage return with more data",
-			Data:    []byte("\r"),
+			Name:    "Empty body with more data",
+			Data:    []byte(""),
 			AtEOF:   false,
 			Advance: 0,
 			Token:   nil,

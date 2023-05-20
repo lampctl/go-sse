@@ -29,8 +29,6 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 			if data[eol+1] == '\n' {
 				crlf = 2
 			}
-		} else if !atEOF {
-			return 0, nil, nil
 		}
 	}
 	return eol + crlf, data[0:eol], nil
