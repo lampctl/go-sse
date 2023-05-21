@@ -14,8 +14,8 @@ type testHandlerServerAndClient struct {
 	Client  *Client
 }
 
-func (h *testHandlerServerAndClient) CreateHandlerAndServer() {
-	h.Handler = NewHandler(nil)
+func (h *testHandlerServerAndClient) CreateHandlerAndServer(cfg *HandlerConfig) {
+	h.Handler = NewHandler(cfg)
 	h.Server = httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -56,9 +56,9 @@ func (h *testHandlerServerAndClient) CloseClient() {
 
 func TestHandler(t *testing.T) {
 	for _, v := range []struct {
-		Name              string
-		ChannelBufferSize int
-		Fn                func(*testHandlerServerAndClient) error
+		Name   string
+		Config *HandlerConfig
+		Fn     func(*testHandlerServerAndClient) error
 	}{
 		{
 			Name: "basic event propagation",
@@ -119,12 +119,30 @@ func TestHandler(t *testing.T) {
 				return receiveAtLeastNEvents(1, h.Client, 2*CLIENT_DELAY)
 			},
 		},
+		{
+			Name: "use callback functions",
+			Config: &HandlerConfig{
+				ConnectedFn: func(r *http.Request) any {
+					return "1"
+				},
+				InitFn: func(v any) []*Event {
+					return []*Event{{}}
+				},
+				FilterFn: func(v any) bool {
+					return v.(string) == "1"
+				},
+			},
+			Fn: func(h *testHandlerServerAndClient) error {
+				h.Handler.Send(&Event{})
+				return receiveAtLeastNEvents(2, h.Client, CLIENT_DELAY)
+			},
+		},
 	} {
 		func() {
 
 			// Create the handler, server, and client
 			h := &testHandlerServerAndClient{}
-			h.CreateHandlerAndServer()
+			h.CreateHandlerAndServer(v.Config)
 			defer h.CloseHandlerAndServer()
 			if err := h.CreateClient(); err != nil {
 				t.Fatalf("%s: %s", v.Name, err)

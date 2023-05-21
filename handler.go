@@ -15,6 +15,23 @@ type HandlerConfig struct {
 	// ChannelBufferSize indicates how many events should be buffered before
 	// the connection is assumed to be dead.
 	ChannelBufferSize int
+
+	// ConnectedFn, if provided, is invoked when a client connects. The return
+	// value of this function is associated with the client and is passed to
+	// InitFn and FilterFn.
+	ConnectedFn func(*http.Request) any
+
+	// InitFn, if provided, is invoked right before a client enters the event
+	// loop and sends any events that it returns to the client. This is useful,
+	// for example, if you are synchronizing application state. The single
+	// parameter is equal to the value returned by ConnectedFn.
+	InitFn func(any) []*Event
+
+	// FilterFn, if provided, is invoked when an event is being sent to a
+	// client to determine if it should actually be sent. The single parameter
+	// is equal to the value returned by ConnectedFn and the return value
+	// should be set to true to send the event.
+	FilterFn func(any) bool
 }
 
 // DefaultHandlerConfig provides a set of defaults.
@@ -47,6 +64,12 @@ func NewHandler(cfg *HandlerConfig) *Handler {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	// Determine if there is a value to associate with this client
+	var v any = nil
+	if h.cfg.ConnectedFn != nil {
+		v = h.cfg.ConnectedFn(r)
+	}
+
 	// We need to be able to flush the writer after each chunk
 	f, ok := w.(http.Flusher)
 	if !ok {
@@ -75,10 +98,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
 
-	// Write the missing events if necessary
-	lastEventID := r.Header.Get("Last-Event-ID")
+	// Make a list of events to send on intialization
+	var (
+		events      = []*Event{}
+		lastEventID = r.Header.Get("Last-Event-ID")
+	)
 	if lastEventID != "" {
-		events := []*Event{}
 		func() {
 			defer h.mutex.Unlock()
 			h.mutex.Lock()
@@ -90,11 +115,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			events = append(events, h.eventQueue[lastEventIdx+1:]...)
 		}()
-		for _, e := range events {
-			w.Write(e.Bytes())
-		}
-		f.Flush()
 	}
+
+	// Include the ones from InitFn (if provided)
+	if h.cfg.InitFn != nil {
+		events = append(events, h.cfg.InitFn(v)...)
+	}
+
+	// Send the messages
+	for _, e := range events {
+		w.Write(e.Bytes())
+	}
+	f.Flush()
 
 	// Write events as they come in
 	for {
@@ -105,8 +137,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				// remove ourselves from the map
 				return
 			}
-			w.Write(e.Bytes())
-			f.Flush()
+			if h.cfg.FilterFn == nil || h.cfg.FilterFn(v) {
+				w.Write(e.Bytes())
+				f.Flush()
+			}
 		case <-r.Context().Done():
 			// Client disconnected, remove this channel from the map
 			func() {
