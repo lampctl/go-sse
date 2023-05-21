@@ -28,10 +28,10 @@ type HandlerConfig struct {
 	InitFn func(any) []*Event
 
 	// FilterFn, if provided, is invoked when an event is being sent to a
-	// client to determine if it should actually be sent. The single parameter
+	// client to determine if it should actually be sent. The first parameter
 	// is equal to the value returned by ConnectedFn and the return value
 	// should be set to true to send the event.
-	FilterFn func(any) bool
+	FilterFn func(any, *Event) bool
 }
 
 // DefaultHandlerConfig provides a set of defaults.
@@ -137,7 +137,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				// remove ourselves from the map
 				return
 			}
-			if h.cfg.FilterFn == nil || h.cfg.FilterFn(v) {
+			if h.cfg.FilterFn == nil || h.cfg.FilterFn(v, e) {
 				w.Write(e.Bytes())
 				f.Flush()
 			}

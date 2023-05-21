@@ -128,7 +128,7 @@ func TestHandler(t *testing.T) {
 				InitFn: func(v any) []*Event {
 					return []*Event{{}}
 				},
-				FilterFn: func(v any) bool {
+				FilterFn: func(v any, _ *Event) bool {
 					return v.(string) == "1"
 				},
 			},
