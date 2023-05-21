@@ -98,12 +98,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
 
-	// Make a list of events to send on intialization
-	var (
-		events      = []*Event{}
-		lastEventID = r.Header.Get("Last-Event-ID")
-	)
+	// Make a list of events to send on intialization if requested
+	lastEventID := r.Header.Get("Last-Event-ID")
 	if lastEventID != "" {
+		events := []*Event{}
 		func() {
 			defer h.mutex.Unlock()
 			h.mutex.Lock()
@@ -115,18 +113,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			events = append(events, h.eventQueue[lastEventIdx+1:]...)
 		}()
+		for _, e := range events {
+			if h.cfg.FilterFn == nil || h.cfg.FilterFn(v, e) {
+				w.Write(e.Bytes())
+			}
+		}
+		f.Flush()
 	}
 
-	// Include the ones from InitFn (if provided)
+	// Send messages received from InitFn (if provided)
 	if h.cfg.InitFn != nil {
-		events = append(events, h.cfg.InitFn(v)...)
+		for _, e := range h.cfg.InitFn(v) {
+			w.Write(e.Bytes())
+		}
+		f.Flush()
 	}
-
-	// Send the messages
-	for _, e := range events {
-		w.Write(e.Bytes())
-	}
-	f.Flush()
 
 	// Write events as they come in
 	for {
