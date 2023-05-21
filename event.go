@@ -23,6 +23,9 @@ type Event struct {
 
 	// Retry is only used when sending events, not receiving them.
 	Retry time.Duration
+
+	// UserData is useful for filtering events with FilterFn in HandlerConfig.
+	UserData any
 }
 
 // Bytes returns the byte representation of the event. Note that the result is
