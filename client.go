@@ -23,6 +23,18 @@ type ClientConfig struct {
 	Context context.Context
 }
 
+// NewClientConfigFromURL creates a ClientConfig for the provided URL, which
+// can then be passed along to NewClient.
+func NewClientConfigFromURL(url string) (*ClientConfig, error) {
+	r, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &ClientConfig{
+		Request: r,
+	}, nil
+}
+
 const defaultReconnectionTime = time.Second * 3
 
 var errConnectionClosed = errors.New("connection was closed by the server")
@@ -135,18 +147,6 @@ func NewClient(cfg *ClientConfig) *Client {
 	)
 	go c.lifecycleLoop(ctx, eventChan, closedChan)
 	return c
-}
-
-// NewClientFromURL creates a new SSE client for the provided URL. By default,
-// GET request is made by http.DefaultClient.
-func NewClientFromURL(url string) (*Client, error) {
-	r, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	return NewClient(&ClientConfig{
-		Request: r,
-	}), nil
 }
 
 // Close disconnects and shuts down the client.

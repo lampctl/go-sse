@@ -31,10 +31,11 @@ import "github.com/lampctl/go-sse"
 Create a client using:
 
 ```golang
-c, err := sse.NewClientFromURL("http://example.com/sse")
+cfg, err := sse.NewClientConfigFromURL("http://example.com/sse")
 if err != nil {
     // ...
 }
+c := sse.NewClient(cfg)
 ```
 
 You can now read events directly from the `c.Events` channel as they are received:

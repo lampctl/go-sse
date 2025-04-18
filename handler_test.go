@@ -39,10 +39,11 @@ func (h *testHandlerServerAndClient) CloseHandlerAndServer() {
 }
 
 func (h *testHandlerServerAndClient) CreateClient() error {
-	c, err := NewClientFromURL(h.Server.URL)
+	cfg, err := NewClientConfigFromURL(h.Server.URL)
 	if err != nil {
 		return err
 	}
+	c := NewClient(cfg)
 	h.Client = c
 	return nil
 }

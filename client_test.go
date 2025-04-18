@@ -147,10 +147,11 @@ func TestClient(t *testing.T) {
 					t.Fatalf("%s: %s", v.Name, serverErr)
 				}
 			}()
-			c, err := NewClientFromURL(s.URL)
+			cfg, err := NewClientConfigFromURL(s.URL)
 			if err != nil {
 				t.Fatalf("%s: %s", v.Name, err)
 			}
+			c := NewClient(cfg)
 			defer c.Close()
 			if err := v.Client(c); err != nil {
 				t.Fatalf("%s: %s", v.Name, err)
