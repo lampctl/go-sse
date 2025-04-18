@@ -7,6 +7,22 @@ import (
 	"time"
 )
 
+// ClientConfig provides a means of passing configuration to NewClient.
+type ClientConfig struct {
+
+	// Request is used as the basis for requests to the SSE endpoint. At a
+	// minimum, it should have the HTTP method and path set.
+	Request *http.Request
+
+	// Client is used for initiating the connection. If set to nil,
+	// http.DefaultClient is used.
+	Client *http.Client
+
+	// Context is used for shutting down the client when Close is called. If
+	// set to nil, context.Background() is used.
+	Context context.Context
+}
+
 const defaultReconnectionTime = time.Second * 3
 
 var errConnectionClosed = errors.New("connection was closed by the server")
@@ -89,21 +105,28 @@ func (c *Client) lifecycleLoop(
 	}
 }
 
-// NewClient creates a new SSE client from the provided parameters. If client
-// is set to nil, http.DefaultClient will be used. The client will begin
-// connecting to the server and continue sending events until an HTTP 204 is
-// received or explicitly terminated with Close().
-func NewClient(req *http.Request, client *http.Client) *Client {
+// NewClient creates a new SSE client instance. The client will immediately
+// begin connecting to the server and continue sending events until an HTTP
+// 204 is received or explicitly terminated with close or by cancelling the
+// the provided context.
+func NewClient(cfg *ClientConfig) *Client {
+	var (
+		client   = cfg.Client
+		ctxParam = cfg.Context
+	)
 	if client == nil {
 		client = http.DefaultClient
 	}
+	if ctxParam == nil {
+		ctxParam = context.Background()
+	}
 	var (
-		ctx, cancel = context.WithCancel(context.Background())
+		ctx, cancel = context.WithCancel(ctxParam)
 		eventChan   = make(chan *Event)
 		closedChan  = make(chan any)
 		c           = &Client{
 			Events:           eventChan,
-			req:              req,
+			req:              cfg.Request,
 			client:           client,
 			reconnectionTime: defaultReconnectionTime,
 			cancel:           cancel,
@@ -114,14 +137,16 @@ func NewClient(req *http.Request, client *http.Client) *Client {
 	return c
 }
 
-// NewClientFromURL creates a new SSE client for the provided URL and uses
-// http.DefaultClient to send the requests.
+// NewClientFromURL creates a new SSE client for the provided URL. By default,
+// GET request is made by http.DefaultClient.
 func NewClientFromURL(url string) (*Client, error) {
 	r, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(r, nil), nil
+	return NewClient(&ClientConfig{
+		Request: r,
+	}), nil
 }
 
 // Close disconnects and shuts down the client.
